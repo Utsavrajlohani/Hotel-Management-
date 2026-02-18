@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand Hotel - Luxury Stay</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap"
+        rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Favicon -->
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/763/763812.png" type="image/png">
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header id="header">
+        <div class="container header-container">
+            <div class="logo">
+                <h1><a href="#">Grand Hotel</a></h1>
+            </div>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="#home" data-i18n="nav_home">Home</a></li>
+                    <li><a href="#rooms" data-i18n="nav_rooms">Rooms</a></li>
+                    <li><a href="#about" data-i18n="nav_about">About</a></li>
+                    <li><a href="#contact" data-i18n="nav_contact">Contact</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <select id="language-selector">
+                    <option value="en">English</option>
+                    <option value="hi">हिंदी (Hindi)</option>
+                    <option value="ne">नेपाली (Nepali)</option>
+                </select>
+                <button id="register-btn" class="btn btn-primary" data-i18n="btn_register">Register</button>
+                <button id="login-btn" class="btn btn-outline" data-i18n="btn_login">Login</button>
+            </div>
+            <button id="dark-mode-toggle" class="btn btn-outline" title="Toggle Dark Mode"><i
+                    class="fas fa-moon"></i></button>
+            <div class="mobile-menu-toggle">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero reveal">
+        <div class="hero-overlay"></div>
+        <div class="hero-content reveal">
+            <h2 data-i18n="hero_title">Experience Luxury Like Never Before</h2>
+            <p data-i18n="hero_subtitle">Your perfect getaway awaits.</p>
+            <a href="#rooms" class="btn btn-primary" data-i18n="btn_book_now">Book Your Stay</a>
+        </div>
+    </section>
+
+    <!-- Rooms Section -->
+    <section id="rooms" class="section reveal">
+        <div class="container">
+            <div class="section-header">
+                <h3 data-i18n="section_rooms_title">Our Rooms</h3>
+                <p data-i18n="section_rooms_subtitle">Select your comfort.</p>
+            </div>
+            <div id="rooms-grid" class="rooms-grid">
+                <!-- Rooms will be injected via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="section bg-light reveal">
+        <div class="container">
+            <div class="about-content">
+                <div class="about-text">
+                    <h3 data-i18n="section_about_title">About Us</h3>
+                    <p data-i18n="about_desc">Grand Hotel offers an unforgettable experience with world-class amenities
+                        and breathtaking views. Whether you are here for business or leisure, we ensure a stay that
+                        feels like home.</p>
+                    <ul class="amenities-list">
+                        <li><i class="fas fa-wifi"></i> <span data-i18n="amenity_wifi">Free Wifi</span></li>
+                        <li><i class="fas fa-swimmer"></i> <span data-i18n="amenity_pool">Swimming Pool</span></li>
+                        <li><i class="fas fa-utensils"></i> <span data-i18n="amenity_restaurant">Restaurant</span></li>
+                        <li><i class="fas fa-spa"></i> <span data-i18n="amenity_spa">Spa & Wellness</span></li>
+                    </ul>
+                </div>
+                <div class="about-image">
+                    <img src="https://placehold.co/600x600/800020/D4AF37?text=Our+Heritage" alt="Grand Hotel Heritage"
+                        style="width: 100%; border-radius: 8px; border: 2px solid var(--accent-color);">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Reviews Section -->
+    <section id="reviews" class="section reveal">
+        <div class="container">
+            <div class="section-header">
+                <h3 data-i18n="section_reviews_title">Guest Reviews</h3>
+            </div>
+            <div id="reviews-grid" class="reviews-grid">
+                <!-- Reviews injected via JS -->
+            </div>
+            <div class="feedback-form-container">
+                <h4 data-i18n="feedback_title">Leave a Review</h4>
+                <form id="feedback-form">
+                    <input type="text" id="feedback-name" placeholder="Your Name" required>
+                    <textarea id="feedback-text" placeholder="Your Feedback" required></textarea>
+                    <button type="submit" class="btn btn-secondary" data-i18n="btn_submit">Submit</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="section bg-dark text-white reveal">
+        <div class="container contact-container">
+            <div class="contact-info">
+                <h3 data-i18n="section_contact_title">Contact Us</h3>
+                <p><i class="fas fa-map-marker-alt"></i> 123 Luxury Avenue, Kathmandu, Nepal</p>
+                <p><i class="fas fa-phone"></i> +977 123 456 7890</p>
+                <p><i class="fas fa-envelope"></i> info@grandhotel.com</p>
+            </div>
+            <div class="inquiry-form">
+                <h4 data-i18n="inquiry_title">Send an Inquiry</h4>
+                <form id="inquiry-form">
+                    <input type="text" placeholder="Name" required>
+                    <input type="email" placeholder="Email" required>
+                    <textarea placeholder="Message" required></textarea>
+                    <button type="submit" class="btn btn-primary" data-i18n="btn_send">Send Message</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="reveal">
+        <div class="container">
+            <p>&copy; 2024 Grand Hotel. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 data-i18n="login_title">Login</h2>
+            <form id="login-form">
+                <input type="text" id="login-phone" placeholder="Phone Number" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit" class="btn btn-primary" data-i18n="btn_login">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="register-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 data-i18n="register_title">Guest Registration</h2>
+            <form id="register-form">
+                <input type="text" id="reg-name" placeholder="Full Name" required>
+                <input type="tel" id="reg-phone" placeholder="Phone Number" required>
+                <input type="password" id="reg-password" placeholder="Password" required>
+                <button type="submit" class="btn btn-primary" data-i18n="btn_register">Register</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="booking-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 data-i18n="booking_title">Book Room</h2>
+            <p id="booking-room-name"></p>
+            <form id="booking-form">
+                <label data-i18n="label_name">Full Name</label>
+                <input type="text" id="booking-name" required>
+
+                <label data-i18n="label_email">Email Address</label>
+                <input type="email" id="booking-email" required>
+
+                <label data-i18n="label_dob">Date of Birth</label>
+                <input type="date" id="booking-dob" required>
+
+                <label data-i18n="label_govtid">Government ID Proof</label>
+                <input type="file" id="booking-govtid" accept="image/*,.pdf" required>
+
+                <label data-i18n="label_checkin">Check-in Date</label>
+                <input type="date" id="checkin-date" required>
+
+                <label data-i18n="label_checkout">Check-out Date</label>
+                <input type="date" id="checkout-date" required>
+
+                <button type="submit" class="btn btn-primary" data-i18n="btn_confirm">Confirm Booking</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <div id="payment-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Secure Payment</h2>
+            <div class="qr-container">
+                <p>Scan to Pay with Any UPI App</p>
+                <div class="qr-code">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=grandhotel@upi&pn=GrandHotel&am=1&cu=INR"
+                        alt="UPI QR">
+                </div>
+                <p>Amount: <strong id="pay-amount">₹0</strong></p>
+                <button id="confirm-payment-btn" class="btn btn-primary">Payment Complete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="lightbox">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="Gallery">
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/data.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
