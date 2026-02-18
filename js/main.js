@@ -1,5 +1,15 @@
 const API_BASE = '/.netlify/functions';
 
+// Helper: convert File to base64 string
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Helper: API Call ---
@@ -296,14 +306,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const paymentModal = document.getElementById('payment-modal');
     let pendingBookingData = null;
 
-    document.getElementById('booking-form').addEventListener('submit', (e) => {
+    document.getElementById('booking-form').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const name = document.getElementById('booking-name').value;
         const email = document.getElementById('booking-email').value;
+        const dob = document.getElementById('booking-dob').value;
         const room = document.getElementById('booking-room-name').innerText.replace('Booking: ', '');
         const checkin = document.getElementById('checkin-date').value;
         const checkout = document.getElementById('checkout-date').value;
+
+        // Convert Govt ID file to base64
+        let govt_id_name = null;
+        let govt_id_data = null;
+        const govtIdFile = document.getElementById('booking-govtid').files[0];
+        if (govtIdFile) {
+            govt_id_name = govtIdFile.name;
+            govt_id_data = await fileToBase64(govtIdFile);
+        }
 
         let price = 0;
         if (room.includes('Deluxe')) price = 2500;
@@ -312,7 +332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.getElementById('pay-amount').innerText = `₹${price}`;
 
-        pendingBookingData = { name, email, room, checkin, checkout, price, status: 'Confirmed' };
+        pendingBookingData = { name, email, dob, govt_id_name, govt_id_data, room, checkin, checkout, price, status: 'Confirmed' };
 
         bookingModal.style.display = 'none';
         paymentModal.style.display = 'block';
