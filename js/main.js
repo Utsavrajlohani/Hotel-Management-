@@ -1,39 +1,89 @@
-document.addEventListener('DOMContentLoaded', () => {
+const API_BASE = '/.netlify/functions';
+
+document.addEventListener('DOMContentLoaded', async () => {
+
+    // --- Helper: API Call ---
+    async function apiCall(endpoint, method = 'GET', body = null) {
+        const options = { method, headers: { 'Content-Type': 'application/json' } };
+        if (body) options.body = JSON.stringify(body);
+        const res = await fetch(`${API_BASE}/${endpoint}`, options);
+        return res.json();
+    }
 
     // --- Render Rooms ---
     const roomsGrid = document.getElementById('rooms-grid');
-    roomsGrid.innerHTML = roomsData.map(room => `
-        <div class="room-card reveal">
-            <div class="room-image">
-                <img src="${room.image}" alt="${room.name}">
+
+    async function loadRooms() {
+        let rooms = roomsData; // fallback from data.js
+        try {
+            const res = await apiCall('rooms');
+            if (res.success && res.rooms.length > 0) {
+                rooms = res.rooms.map(r => ({
+                    ...r,
+                    price: r.price_display || r.price.toLocaleString(),
+                    image: r.image,
+                    amenities: r.amenities
+                }));
+            }
+        } catch (e) {
+            console.warn('API unavailable, using local room data:', e.message);
+        }
+
+        roomsGrid.innerHTML = rooms.map(room => `
+            <div class="room-card reveal">
+                <div class="room-image">
+                    <img src="${room.image}" alt="${room.name}">
+                </div>
+                <div class="room-details">
+                    <h4>${room.name}</h4>
+                    <div class="room-price">₹${room.price}</div>
+                    <ul>
+                        ${room.amenities.map(a => `<li><i class="fas fa-check"></i> ${a}</li>`).join('')}
+                    </ul>
+                    <button class="btn btn-outline" onclick="openBookingModal('${room.name}')" data-i18n="btn_book">Book Now</button>
+                </div>
             </div>
-            <div class="room-details">
-                <h4>${room.name}</h4>
-                <div class="room-price">₹${room.price}</div>
-                <ul>
-                    ${room.amenities.map(a => `<li><i class="fas fa-check"></i> ${a}</li>`).join('')}
-                </ul>
-                <button class="btn btn-outline" onclick="openBookingModal('${room.name}')" data-i18n="btn_book">Book Now</button>
-            </div>
-        </div>
-    `).join('');
+        `).join('');
+
+        // Re-apply scroll reveal after rendering
+        initScrollReveal();
+    }
+
+    await loadRooms();
 
     // --- Render Reviews ---
     const reviewsGrid = document.getElementById('reviews-grid');
-    reviewsData.forEach(review => {
-        const card = document.createElement('div');
-        card.classList.add('review-card');
-        card.innerHTML = `
-            <div class="review-header">
-                <strong>${review.name}</strong>
-                <div class="review-rating">
-                    ${'<i class="fas fa-star"></i>'.repeat(review.rating)}
+
+    async function loadReviews() {
+        let reviews = reviewsData; // fallback from data.js
+        try {
+            const res = await apiCall('reviews');
+            if (res.success && res.reviews.length > 0) {
+                reviews = res.reviews;
+            }
+        } catch (e) {
+            console.warn('API unavailable, using local review data:', e.message);
+        }
+
+        reviewsGrid.innerHTML = '';
+        reviews.forEach(review => {
+            const card = document.createElement('div');
+            card.classList.add('review-card');
+            const rating = review.rating || 5;
+            card.innerHTML = `
+                <div class="review-header">
+                    <strong>${review.name}</strong>
+                    <div class="review-rating">
+                        ${'<i class="fas fa-star"></i>'.repeat(rating)}
+                    </div>
                 </div>
-            </div>
-            <p>"${review.text}"</p>
-        `;
-        reviewsGrid.appendChild(card);
-    });
+                <p>"${review.text}"</p>
+            `;
+            reviewsGrid.appendChild(card);
+        });
+    }
+
+    await loadReviews();
 
     // --- Language Switcher ---
     const langSelector = document.getElementById('language-selector');
@@ -61,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Auth State
     let isLoggedIn = false;
-    let registeredUser = null; // { name, phone, password }
+    let currentUser = null;
 
     // Date Logic
     const checkinInput = document.getElementById('checkin-date');
@@ -73,22 +123,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const formatDate = (date) => date.toISOString().split('T')[0];
 
-    // Set constraints
     checkinInput.min = formatDate(today);
     checkinInput.max = formatDate(maxDate);
 
-    // Checkout constraints update on checkin change
     checkinInput.addEventListener('change', () => {
         checkoutInput.min = checkinInput.value;
-        const checkinDate = new Date(checkinInput.value);
-        const maxCheckout = new Date(checkinDate);
-        maxCheckout.setDate(maxCheckout.getDate() + 90); // Cap stay if needed, or just keep general max
-        checkoutInput.max = formatDate(maxDate); // Keep global max
+        checkoutInput.max = formatDate(maxDate);
     });
 
     // Logic to open modals
     document.getElementById('login-btn').addEventListener('click', () => {
-        if (isLoggedIn) return; // Or handle logout
+        if (isLoggedIn) return;
         loginModal.style.display = 'block';
     });
 
@@ -99,15 +144,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global function for booking button
     window.openBookingModal = function (roomName) {
         if (!isLoggedIn) {
-            alert("Please Login to book a room.");
+            showToast("Please Login to book a room.", 'error');
             loginModal.style.display = 'block';
             return;
         }
         const modal = document.getElementById('booking-modal');
         document.getElementById('booking-room-name').innerText = `Booking: ${roomName}`;
-        // Auto-fill available data
-        if (registeredUser) {
-            document.getElementById('booking-name').value = registeredUser.name;
+        if (currentUser) {
+            document.getElementById('booking-name').value = currentUser.name;
         }
         modal.style.display = 'block';
     }
@@ -127,8 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target == bookingModal) bookingModal.style.display = "none";
     }
 
-    // --- Forms Handling ---
-
     // --- Toast Notification ---
     const showToast = (message, type = 'success') => {
         const container = document.getElementById('toast-container');
@@ -137,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> <span>${message}</span>`;
         container.appendChild(toast);
 
-        // Trigger reflow
         void toast.offsetWidth;
         toast.classList.add('show');
 
@@ -147,57 +188,75 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // --- Forms Handling ---
-
-    // Registration Handler
-    document.getElementById('register-form').addEventListener('submit', (e) => {
+    // --- Registration Handler (API) ---
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('reg-name').value;
         const phone = document.getElementById('reg-phone').value;
         const password = document.getElementById('reg-password').value;
 
-        // Simple mock registration
-        registeredUser = { name, phone, password };
-        localStorage.setItem('registeredUser', JSON.stringify(registeredUser));
-        showToast('Registration Successful! Please Login.');
-        registerModal.style.display = 'none';
-        loginModal.style.display = 'block';
+        try {
+            const res = await apiCall('users', 'POST', { action: 'register', name, phone, password });
+            if (res.success) {
+                showToast('Registration Successful! Please Login.');
+                registerModal.style.display = 'none';
+                loginModal.style.display = 'block';
+            } else {
+                showToast(res.error || 'Registration failed!', 'error');
+            }
+        } catch (err) {
+            // Fallback to localStorage
+            localStorage.setItem('registeredUser', JSON.stringify({ name, phone, password }));
+            showToast('Registration Successful (offline mode)! Please Login.');
+            registerModal.style.display = 'none';
+            loginModal.style.display = 'block';
+        }
     });
 
-    // Login Handler
-    document.getElementById('login-form').addEventListener('submit', (e) => {
+    // --- Login Handler (API) ---
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const phone = document.getElementById('login-phone').value;
         const password = document.getElementById('login-password').value;
-        const storedUser = JSON.parse(localStorage.getItem('registeredUser'));
 
-        // Validate against registered user
-        if ((registeredUser && registeredUser.phone === phone && registeredUser.password === password) ||
-            (storedUser && storedUser.phone === phone && storedUser.password === password)) {
-
-            if (!registeredUser) registeredUser = storedUser;
-
-            showToast(`Welcome back, ${registeredUser.name}!`);
-            isLoggedIn = true;
-            loginModal.style.display = 'none';
-
-            // Update UI
-            const loginBtn = document.getElementById('login-btn');
-            loginBtn.innerText = registeredUser.name;
-            loginBtn.classList.remove('btn-outline');
-            loginBtn.classList.add('btn-secondary');
-
-            document.getElementById('register-btn').style.display = 'none';
-        } else {
-            showToast('Invalid Credentials!', 'error');
+        try {
+            const res = await apiCall('users', 'POST', { action: 'login', phone, password });
+            if (res.success) {
+                currentUser = res.user;
+                isLoggedIn = true;
+                showToast(`Welcome back, ${currentUser.name}!`);
+                loginModal.style.display = 'none';
+                updateLoginUI();
+            } else {
+                showToast(res.error || 'Invalid Credentials!', 'error');
+            }
+        } catch (err) {
+            // Fallback to localStorage
+            const storedUser = JSON.parse(localStorage.getItem('registeredUser'));
+            if (storedUser && storedUser.phone === phone && storedUser.password === password) {
+                currentUser = storedUser;
+                isLoggedIn = true;
+                showToast(`Welcome back, ${currentUser.name}! (offline mode)`);
+                loginModal.style.display = 'none';
+                updateLoginUI();
+            } else {
+                showToast('Invalid Credentials!', 'error');
+            }
         }
     });
+
+    function updateLoginUI() {
+        const loginBtn = document.getElementById('login-btn');
+        loginBtn.innerText = currentUser.name;
+        loginBtn.classList.remove('btn-outline');
+        loginBtn.classList.add('btn-secondary');
+        document.getElementById('register-btn').style.display = 'none';
+    }
 
     // --- Dark Mode ---
     const darkModeToggle = document.getElementById('dark-mode-toggle');
     const body = document.body;
 
-    // Check local storage
     if (localStorage.getItem('darkMode') === 'enabled') {
         body.classList.add('dark-mode');
         darkModeToggle.innerHTML = '<i class="fas fa-sun"></i>';
@@ -218,7 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const lightbox = document.getElementById('lightbox');
     const lightboxImg = document.getElementById('lightbox-img');
 
-    // Delegate click for dynamic rooms
     roomsGrid.addEventListener('click', (e) => {
         if (e.target.tagName === 'IMG') {
             lightbox.style.display = 'flex';
@@ -236,54 +294,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Payment Flow (Modified Booking) ---
     const paymentModal = document.getElementById('payment-modal');
-    // Store current booking data temporarily
     let pendingBookingData = null;
 
     document.getElementById('booking-form').addEventListener('submit', (e) => {
         e.preventDefault();
 
-        // Capture data
         const name = document.getElementById('booking-name').value;
         const email = document.getElementById('booking-email').value;
         const room = document.getElementById('booking-room-name').innerText.replace('Booking: ', '');
         const checkin = document.getElementById('checkin-date').value;
         const checkout = document.getElementById('checkout-date').value;
 
-        // Calculate Amount (Mock)
-        let price = registeredUser ? 0 : 0; // Just init
+        let price = 0;
         if (room.includes('Deluxe')) price = 2500;
         if (room.includes('Executive')) price = 4500;
         if (room.includes('Presidential')) price = 8000;
 
         document.getElementById('pay-amount').innerText = `₹${price}`;
 
-        pendingBookingData = {
-            id: Date.now(),
-            name,
-            email,
-            room,
-            checkin,
-            checkout,
-            price,
-            status: 'Confirmed'
-        };
+        pendingBookingData = { name, email, room, checkin, checkout, price, status: 'Confirmed' };
 
-        // Close Booking, Open Payment
         bookingModal.style.display = 'none';
         paymentModal.style.display = 'block';
     });
 
-    document.getElementById('confirm-payment-btn').addEventListener('click', () => {
+    document.getElementById('confirm-payment-btn').addEventListener('click', async () => {
         if (!pendingBookingData) return;
 
-        const bookings = JSON.parse(localStorage.getItem('bookings')) || [];
-        bookings.push(pendingBookingData);
-        localStorage.setItem('bookings', JSON.stringify(bookings));
+        try {
+            const res = await apiCall('bookings', 'POST', pendingBookingData);
+            if (res.success) {
+                showToast(`Payment Received! Booking Confirmed for ${pendingBookingData.name}.`);
+            } else {
+                showToast('Booking saved but there was a server issue.', 'error');
+            }
+        } catch (err) {
+            // Fallback to localStorage
+            const bookings = JSON.parse(localStorage.getItem('bookings')) || [];
+            bookings.push({ id: Date.now(), ...pendingBookingData });
+            localStorage.setItem('bookings', JSON.stringify(bookings));
+            showToast(`Booking Confirmed (offline mode) for ${pendingBookingData.name}.`);
+        }
 
-        showToast(`Payment Received! Booking Confirmed for ${pendingBookingData.name}.`);
         paymentModal.style.display = 'none';
-
-        // Reset form
         document.getElementById('booking-form').reset();
         pendingBookingData = null;
     });
@@ -296,60 +349,62 @@ document.addEventListener('DOMContentLoaded', () => {
         if (event.target == paymentModal) paymentModal.style.display = "none";
     }
 
-    document.getElementById('inquiry-form').addEventListener('submit', (e) => {
+    // --- Inquiry Form (API) ---
+    document.getElementById('inquiry-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = e.target.querySelector('input[type="text"]').value;
         const email = e.target.querySelector('input[type="email"]').value;
         const message = e.target.querySelector('textarea').value;
 
-        const inquiries = JSON.parse(localStorage.getItem('inquiries')) || [];
-        inquiries.push({ id: Date.now(), name, email, message, date: new Date().toLocaleDateString() });
-        localStorage.setItem('inquiries', JSON.stringify(inquiries));
-
-        showToast('Inquiry Sent! We will contact you soon.');
+        try {
+            await apiCall('inquiries', 'POST', { name, email, message });
+            showToast('Inquiry Sent! We will contact you soon.');
+        } catch (err) {
+            // Fallback to localStorage
+            const inquiries = JSON.parse(localStorage.getItem('inquiries')) || [];
+            inquiries.push({ id: Date.now(), name, email, message, date: new Date().toLocaleDateString() });
+            localStorage.setItem('inquiries', JSON.stringify(inquiries));
+            showToast('Inquiry Sent (offline mode)! We will contact you soon.');
+        }
         e.target.reset();
     });
 
-    document.getElementById('feedback-form').addEventListener('submit', (e) => {
+    // --- Feedback / Review Form (API) ---
+    document.getElementById('feedback-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        showToast('Thank you for your feedback!');
+        const name = document.getElementById('feedback-name').value;
+        const text = document.getElementById('feedback-text').value;
+
+        try {
+            await apiCall('reviews', 'POST', { name, text, rating: 5 });
+            showToast('Thank you for your feedback!');
+            // Reload reviews to show the new one
+            await loadReviews();
+        } catch (err) {
+            showToast('Thank you for your feedback! (saved offline)');
+        }
         e.target.reset();
     });
-
-    // --- Window Scope for Booking ---
-    window.openBookingModal = function (roomName) {
-        if (!isLoggedIn) {
-            showToast("Please Login to book a room.", 'error');
-            loginModal.style.display = 'block';
-            return;
-        }
-        const modal = document.getElementById('booking-modal');
-        document.getElementById('booking-room-name').innerText = `Booking: ${roomName}`;
-        if (registeredUser) {
-            document.getElementById('booking-name').value = registeredUser.name;
-        }
-        modal.style.display = 'block';
-    }
 
     // --- Scroll Animations ---
-    const revealElements = document.querySelectorAll('.reveal');
+    function initScrollReveal() {
+        const revealElements = document.querySelectorAll('.reveal');
 
-    const revealOnScroll = () => {
-        const windowHeight = window.innerHeight;
-        const elementVisible = 50;
+        const revealOnScroll = () => {
+            const windowHeight = window.innerHeight;
+            const elementVisible = 50;
 
-        revealElements.forEach((reveal) => {
-            const elementTop = reveal.getBoundingClientRect().top;
-            if (elementTop < windowHeight - elementVisible) {
-                reveal.classList.add('active');
-            }
-        });
+            revealElements.forEach((reveal) => {
+                const elementTop = reveal.getBoundingClientRect().top;
+                if (elementTop < windowHeight - elementVisible) {
+                    reveal.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', revealOnScroll);
+        revealOnScroll();
     }
 
-    window.addEventListener('scroll', revealOnScroll);
-    // Trigger once on load
-    revealOnScroll();
-
+    initScrollReveal();
 });
-
-

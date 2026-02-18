@@ -1,0 +1,11 @@
+{
+  "name": "grand-hotel",
+  "version": "1.0.0",
+  "description": "Grand Hotel - Luxury Stay Management System",
+  "scripts": {
+    "dev": "netlify dev"
+  },
+  "dependencies": {
+    "@netlify/neon": "^0.1.0"
+  }
+}
