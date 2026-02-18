@@ -156,9 +156,7 @@ function renderBookingsTable(bookings) {
     tbody.innerHTML = '';
     bookings.forEach(b => {
         const statusClass = (b.status || '').toLowerCase().includes('cancel') ? 'cancelled' : '';
-        const govtIdCell = b.govt_id_data
-            ? `<a class="govtid-link" onclick="viewGovtId('${b.govt_id_data.replace(/'/g, "\\'")}')">📄 ${b.govt_id_name || 'View'}</a>`
-            : '—';
+        const govtIdCell = b.govt_id || '—';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `

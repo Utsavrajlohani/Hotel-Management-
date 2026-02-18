@@ -6,11 +6,11 @@ export default async (req) => {
 
     try {
         if (req.method === 'POST') {
-            const { name, email, dob, govt_id_name, govt_id_data, room, checkin, checkout, price, status } = await req.json();
+            const { name, email, dob, govt_id, room, checkin, checkout, price, status } = await req.json();
 
             const result = await sql`
-        INSERT INTO bookings (name, email, dob, govt_id_name, govt_id_data, room, checkin, checkout, price, status)
-        VALUES (${name}, ${email}, ${dob || null}, ${govt_id_name || null}, ${govt_id_data || null}, ${room}, ${checkin}, ${checkout}, ${price}, ${status || 'Confirmed'})
+        INSERT INTO bookings (name, email, dob, govt_id, room, checkin, checkout, price, status)
+        VALUES (${name}, ${email}, ${dob || null}, ${govt_id || null}, ${room}, ${checkin}, ${checkout}, ${price}, ${status || 'Confirmed'})
         RETURNING *
       `;
 

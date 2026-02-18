@@ -37,8 +37,7 @@ export default async (req) => {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL,
         dob DATE,
-        govt_id_name VARCHAR(255),
-        govt_id_data TEXT,
+        govt_id VARCHAR(255),
         room VARCHAR(255) NOT NULL,
         checkin DATE NOT NULL,
         checkout DATE NOT NULL,
@@ -111,8 +110,7 @@ export default async (req) => {
     // Add dob/govt_id columns to bookings if missing
     try {
       await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dob DATE`;
-      await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS govt_id_name VARCHAR(255)`;
-      await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS govt_id_data TEXT`;
+      await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS govt_id VARCHAR(255)`;
     } catch (e) { /* columns may already exist */ }
 
     return new Response(JSON.stringify({ success: true, message: 'Database initialized successfully!' }), {
