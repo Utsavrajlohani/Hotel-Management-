@@ -885,3 +885,170 @@ body.dark-mode .booking-history-item {
 body.dark-mode .star-rating i {
     color: #555;
 }
+
+/* Room Comparison */
+.compare-checkbox {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 5;
+}
+
+.compare-checkbox input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+}
+
+.compare-btn-container {
+    text-align: center;
+    margin: 15px 0;
+}
+
+#compare-modal .modal-content {
+    max-width: 800px;
+}
+
+.compare-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.compare-table th,
+.compare-table td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: center;
+}
+
+.compare-table th {
+    background: var(--secondary-color);
+    color: var(--primary-color);
+    font-family: var(--font-heading);
+}
+
+.compare-table img {
+    width: 150px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+/* Booking Countdown */
+.countdown-container {
+    text-align: center;
+    padding: 20px;
+    background: linear-gradient(135deg, var(--secondary-color), #2a0a0a);
+    border-radius: 8px;
+    margin-top: 15px;
+    border: 2px solid var(--primary-color);
+}
+
+.countdown-container h4 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.countdown-timer {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.countdown-timer .time-box {
+    background: rgba(212, 175, 55, 0.15);
+    padding: 15px 20px;
+    border-radius: 8px;
+    min-width: 70px;
+    border: 1px solid var(--primary-color);
+}
+
+.countdown-timer .time-box span {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    font-family: var(--font-heading);
+}
+
+.countdown-timer .time-box small {
+    color: #ccc;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+/* Coupon Code */
+.coupon-section {
+    margin: 15px 0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.coupon-section input {
+    flex: 1;
+    padding: 10px;
+    border: 2px dashed var(--primary-color);
+    border-radius: 4px;
+    font-family: var(--font-heading);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 0;
+}
+
+.coupon-section .btn-apply {
+    padding: 10px 20px;
+    background: var(--primary-color);
+    color: var(--secondary-color);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-heading);
+    font-weight: 700;
+}
+
+.coupon-discount {
+    color: #27ae60;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+
+/* Night Count Display */
+.night-count {
+    text-align: center;
+    padding: 10px;
+    background: var(--bg-light);
+    border-radius: 4px;
+    font-family: var(--font-heading);
+    margin: 10px 0;
+    border: 1px solid var(--primary-color);
+}
+
+.night-count strong {
+    color: var(--royal-crimson);
+    font-size: 1.2rem;
+}
+
+/* PWA Install Banner */
+.pwa-install-banner {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--secondary-color);
+    color: var(--primary-color);
+    padding: 12px 25px;
+    border-radius: 30px;
+    z-index: 9998;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+    display: none;
+    border: 2px solid var(--primary-color);
+    font-family: var(--font-heading);
+    cursor: pointer;
+}
+
+.pwa-install-banner:hover {
+    background: #2a0a0a;
+}

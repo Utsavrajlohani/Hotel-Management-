@@ -17,6 +17,9 @@
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/763/763812.png" type="image/png">
     <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#D4AF37">
+    <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 
 <body>
@@ -97,6 +100,10 @@
             </div>
             <div id="rooms-grid" class="rooms-grid">
                 <!-- Rooms will be injected via JS -->
+            </div>
+            <div class="compare-btn-container">
+                <button id="compare-rooms-btn" class="btn btn-secondary" style="display:none;"><i
+                        class="fas fa-columns"></i> Compare Selected Rooms</button>
             </div>
         </div>
     </section>
@@ -233,6 +240,14 @@
                 <label data-i18n="label_checkout">Check-out Date</label>
                 <input type="date" id="checkout-date" required>
 
+                <div id="night-count" class="night-count" style="display:none;"></div>
+
+                <div class="coupon-section">
+                    <input type="text" id="coupon-code" placeholder="PROMO CODE">
+                    <button type="button" id="apply-coupon-btn" class="btn-apply">Apply</button>
+                </div>
+                <p id="coupon-msg" class="coupon-discount" style="display:none;"></p>
+
                 <button type="submit" class="btn btn-primary" data-i18n="btn_confirm">Confirm Booking</button>
             </form>
         </div>
@@ -253,6 +268,15 @@
                 </div>
                 <p>Amount: <strong id="pay-amount">₹0</strong></p>
                 <button id="confirm-payment-btn" class="btn btn-primary">Payment Complete</button>
+            </div>
+            <div id="booking-countdown" class="countdown-container" style="display:none;">
+                <h4>⏳ Countdown to Check-in</h4>
+                <div class="countdown-timer">
+                    <div class="time-box"><span id="cd-days">0</span><small>Days</small></div>
+                    <div class="time-box"><span id="cd-hours">0</span><small>Hours</small></div>
+                    <div class="time-box"><span id="cd-mins">0</span><small>Mins</small></div>
+                    <div class="time-box"><span id="cd-secs">0</span><small>Secs</small></div>
+                </div>
             </div>
         </div>
     </div>
@@ -278,6 +302,20 @@
                 <div id="profile-bookings">No bookings yet.</div>
             </div>
         </div>
+    </div>
+
+    <!-- Room Comparison Modal -->
+    <div id="compare-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2><i class="fas fa-columns"></i> Room Comparison</h2>
+            <div id="compare-table-container"></div>
+        </div>
+    </div>
+
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner" class="pwa-install-banner">
+        <i class="fas fa-download"></i> Install Grand Hotel App
     </div>
 
     <!-- EmailJS SDK -->

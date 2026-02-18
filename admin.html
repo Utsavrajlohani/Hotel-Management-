@@ -12,7 +12,6 @@
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/763/763812.png" type="image/png">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/admin.css">
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 
@@ -28,6 +27,9 @@
                 <li class="active" data-tab="dashboard"><i class="fas fa-chart-line"></i> Dashboard</li>
                 <li data-tab="bookings"><i class="fas fa-calendar-check"></i> Bookings</li>
                 <li data-tab="inquiries"><i class="fas fa-envelope"></i> Inquiries</li>
+                <li data-tab="rooms-mgmt"><i class="fas fa-bed"></i> Rooms</li>
+                <li data-tab="blacklist"><i class="fas fa-ban"></i> Blacklist</li>
+                <li data-tab="coupons-mgmt"><i class="fas fa-ticket-alt"></i> Coupons</li>
                 <li id="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</li>
             </ul>
         </aside>
@@ -61,6 +63,16 @@
                         <h3>Total Users</h3>
                         <p id="total-users">0</p>
                     </div>
+                </div>
+                <!-- Date Range Filter -->
+                <div class="admin-action-bar" style="margin-bottom:15px;">
+                    <label style="margin-right:10px;">Filter:</label>
+                    <select id="date-range-filter" class="status-select" style="width:auto;">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
                 </div>
                 <!-- Revenue Chart -->
                 <div class="chart-container">
@@ -119,6 +131,102 @@
                     </table>
                 </div>
             </section>
+
+            <!-- Room Management Tab -->
+            <section id="rooms-mgmt" class="tab-content">
+                <div class="admin-action-bar">
+                    <h3 style="margin:0;flex:1;">Room Inventory</h3>
+                    <button class="btn-export" onclick="showAddRoomForm()"><i class="fas fa-plus"></i> Add Room</button>
+                </div>
+                <div id="room-form-area" style="display:none; margin-bottom:20px;">
+                    <div class="login-box" style="max-width:600px;margin:0 auto;">
+                        <h3 id="room-form-title">Add New Room</h3>
+                        <input type="text" id="rm-name" placeholder="Room Name"
+                            style="width:100%;padding:10px;margin-bottom:10px;">
+                        <input type="number" id="rm-price" placeholder="Price per Night (₹)"
+                            style="width:100%;padding:10px;margin-bottom:10px;">
+                        <input type="text" id="rm-amenities" placeholder="Amenities (comma-separated)"
+                            style="width:100%;padding:10px;margin-bottom:10px;">
+                        <input type="url" id="rm-image" placeholder="Image URL"
+                            style="width:100%;padding:10px;margin-bottom:10px;">
+                        <input type="hidden" id="rm-edit-id">
+                        <button class="btn btn-primary" onclick="saveRoom()" style="width:100%;">Save Room</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Image</th>
+                                <th>Name</th>
+                                <th>Price</th>
+                                <th>Amenities</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rooms-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Blacklist Tab -->
+            <section id="blacklist" class="tab-content">
+                <div class="admin-action-bar">
+                    <h3 style="margin:0;flex:1;">Guest Blacklist</h3>
+                </div>
+                <div style="margin-bottom:20px;display:flex;gap:10px;">
+                    <input type="tel" id="bl-phone" placeholder="Phone Number" style="flex:1;padding:10px;">
+                    <input type="text" id="bl-reason" placeholder="Reason" style="flex:2;padding:10px;">
+                    <button class="btn btn-primary" onclick="addToBlacklist()">Block</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Phone</th>
+                                <th>Reason</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="blacklist-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Coupons Management Tab -->
+            <section id="coupons-mgmt" class="tab-content">
+                <div class="admin-action-bar">
+                    <h3 style="margin:0;flex:1;">Promo Coupons</h3>
+                </div>
+                <div style="margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;">
+                    <input type="text" id="cp-code" placeholder="CODE"
+                        style="flex:1;padding:10px;text-transform:uppercase;">
+                    <input type="number" id="cp-discount" placeholder="Discount" style="width:100px;padding:10px;">
+                    <select id="cp-type" style="padding:10px;">
+                        <option value="percent">% Off</option>
+                        <option value="flat">₹ Flat</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="addCoupon()">Add Coupon</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Discount</th>
+                                <th>Type</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="coupons-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -128,16 +236,6 @@
             <h2>Admin Access</h2>
             <input type="password" id="admin-pin" placeholder="Enter PIN">
             <button id="admin-login-btn" class="btn btn-primary">Unlock</button>
-        </div>
-    </div>
-
-    <!-- Govt ID Viewer Modal -->
-    <div id="govtid-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal"
-                onclick="document.getElementById('govtid-modal').style.display='none'">&times;</span>
-            <h2>Government ID</h2>
-            <img id="govtid-image" class="govtid-preview" src="" alt="Govt ID">
         </div>
     </div>
 

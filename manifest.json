@@ -1,0 +1,18 @@
+{
+    "name": "Grand Hotel - Luxury Stay",
+    "short_name": "Grand Hotel",
+    "description": "Experience luxury like never before at Grand Hotel Nepal",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#1A0505",
+    "theme_color": "#D4AF37",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "https://cdn-icons-png.flaticon.com/512/763/763812.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

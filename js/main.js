@@ -1,12 +1,32 @@
 const API_BASE = '/.netlify/functions';
 
-
-
 // Loading spinner helpers
 function showLoading() { document.getElementById('loading-overlay').classList.add('active'); }
 function hideLoading() { document.getElementById('loading-overlay').classList.remove('active'); }
 
 document.addEventListener('DOMContentLoaded', async () => {
+
+    // --- Register Service Worker (PWA) ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(e => console.log('SW:', e));
+    }
+
+    // --- PWA Install Prompt ---
+    let deferredPrompt = null;
+    const installBanner = document.getElementById('pwa-install-banner');
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBanner.style.display = 'block';
+    });
+    installBanner.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            installBanner.style.display = 'none';
+        }
+    });
 
     // --- Helper: API Call ---
     async function apiCall(endpoint, method = 'GET', body = null) {
@@ -45,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3000);
     }
 
-    // --- Session Management (JWT-like via localStorage) ---
+    // --- Session Management ---
     let currentUser = JSON.parse(sessionStorage.getItem('hotelSession')) || null;
     let isLoggedIn = !!currentUser;
 
@@ -61,13 +81,54 @@ document.addEventListener('DOMContentLoaded', async () => {
         sessionStorage.removeItem('hotelSession');
     }
 
-    // Restore session on page load
-    if (isLoggedIn) {
-        updateLoginUI();
+    if (isLoggedIn) updateLoginUI();
+
+    // --- Coupon / Promo Codes ---
+    const COUPONS = {
+        'WELCOME10': { discount: 10, type: 'percent', label: '10% Off' },
+        'FLAT500': { discount: 500, type: 'flat', label: '₹500 Off' },
+        'LUXURY20': { discount: 20, type: 'percent', label: '20% Off' },
+        'GRAND15': { discount: 15, type: 'percent', label: '15% Off' }
+    };
+    let appliedCoupon = null;
+
+    document.getElementById('apply-coupon-btn').addEventListener('click', () => {
+        const code = document.getElementById('coupon-code').value.trim().toUpperCase();
+        const msgEl = document.getElementById('coupon-msg');
+        if (COUPONS[code]) {
+            appliedCoupon = { code, ...COUPONS[code] };
+            msgEl.textContent = `✅ Coupon "${code}" applied! ${appliedCoupon.label}`;
+            msgEl.style.display = 'block';
+            msgEl.style.color = '#27ae60';
+            showToast(`Coupon "${code}" applied — ${appliedCoupon.label}`);
+        } else {
+            appliedCoupon = null;
+            msgEl.textContent = '❌ Invalid coupon code';
+            msgEl.style.display = 'block';
+            msgEl.style.color = '#e74c3c';
+        }
+    });
+
+    // --- Seasonal Pricing ---
+    function getSeasonMultiplier() {
+        const month = new Date().getMonth() + 1; // 1-12
+        // Peak: Oct-Dec (Dashain/Tihar/Christmas/NYE), Mar-Apr (Spring)
+        if ([10, 11, 12, 3, 4].includes(month)) return 1.25;
+        // Off-season: Jun-Aug (monsoon)
+        if ([6, 7, 8].includes(month)) return 0.85;
+        return 1.0;
+    }
+
+    function getSeasonLabel() {
+        const m = getSeasonMultiplier();
+        if (m > 1) return '🔥 Peak Season (+25%)';
+        if (m < 1) return '💧 Off-Season (-15%)';
+        return '';
     }
 
     // --- Rooms Data ---
-    let allRooms = roomsData; // fallback from data.js
+    let allRooms = roomsData;
+    let compareList = [];
 
     async function loadRooms() {
         try {
@@ -88,7 +149,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderRooms(allRooms);
     }
 
-    // --- Room Rendering with Gallery Carousel ---
+    // --- Room Rendering with Gallery, Compare Checkbox, Seasonal Price ---
     const roomsGrid = document.getElementById('rooms-grid');
 
     function renderRooms(rooms) {
@@ -97,13 +158,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             roomsGrid.innerHTML = '<p style="text-align:center;grid-column:1/-1;font-size:1.3rem;color:#888;">No rooms match your filters.</p>';
             return;
         }
+        const seasonMult = getSeasonMultiplier();
+        const seasonLabel = getSeasonLabel();
+
         rooms.forEach(room => {
             const gallery = room.gallery || [room.image];
+            const seasonPrice = Math.round(room.price * seasonMult);
             const card = document.createElement('div');
             card.className = 'room-card reveal active';
             card.innerHTML = `
                 <div class="room-image" data-index="0">
                     <img src="${gallery[0]}" alt="${room.name}" loading="lazy">
+                    <label class="compare-checkbox" title="Compare"><input type="checkbox" data-room-id="${room.id}" ${compareList.includes(room.id) ? 'checked' : ''}></label>
                     ${gallery.length > 1 ? `
                         <button class="gallery-nav gallery-prev" onclick="galleryNav(this, -1)">‹</button>
                         <button class="gallery-nav gallery-next" onclick="galleryNav(this, 1)">›</button>
@@ -114,17 +180,49 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
                 <div class="room-details">
                     <h4>${room.name}</h4>
-                    <p class="room-price">₹${room.price_display || room.price} / night</p>
+                    <p class="room-price">₹${seasonPrice.toLocaleString()} / night ${seasonLabel ? `<small>${seasonLabel}</small>` : ''}</p>
                     <p>${(room.amenities || []).join(' • ')}</p>
-                    <button class="btn btn-primary book-room-btn" data-room="${room.name}">Book Now</button>
+                    <button class="btn btn-primary book-room-btn" data-room="${room.name}" data-price="${seasonPrice}">Book Now</button>
                 </div>
             `;
-            // Store gallery data on the element
             card.querySelector('.room-image').dataset.gallery = JSON.stringify(gallery);
             roomsGrid.appendChild(card);
         });
 
-        // Attach booking handlers
+        // LazyLoad via IntersectionObserver
+        const lazyImages = roomsGrid.querySelectorAll('img[loading="lazy"]');
+        if ('IntersectionObserver' in window) {
+            const io = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        img.src = img.src; // trigger load
+                        io.unobserve(img);
+                    }
+                });
+            });
+            lazyImages.forEach(img => io.observe(img));
+        }
+
+        // Compare checkboxes
+        roomsGrid.querySelectorAll('.compare-checkbox input').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const roomId = parseInt(cb.dataset.roomId);
+                if (cb.checked) {
+                    if (compareList.length >= 3) {
+                        cb.checked = false;
+                        showToast('You can compare up to 3 rooms only.', 'error');
+                        return;
+                    }
+                    compareList.push(roomId);
+                } else {
+                    compareList = compareList.filter(id => id !== roomId);
+                }
+                document.getElementById('compare-rooms-btn').style.display = compareList.length >= 2 ? 'inline-block' : 'none';
+            });
+        });
+
+        // Booking handlers
         document.querySelectorAll('.book-room-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!isLoggedIn) {
@@ -133,12 +231,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
                 document.getElementById('booking-room-name').innerText = `Booking: ${btn.dataset.room}`;
+                document.getElementById('booking-room-name').dataset.price = btn.dataset.price;
                 bookingModal.style.display = 'block';
             });
         });
     }
 
-    // Gallery carousel navigation
+    // Gallery carousel
     window.galleryNav = function (btn, dir) {
         const container = btn.closest('.room-image');
         const gallery = JSON.parse(container.dataset.gallery);
@@ -152,6 +251,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
+    // --- Room Comparison ---
+    document.getElementById('compare-rooms-btn').addEventListener('click', () => {
+        const rooms = allRooms.filter(r => compareList.includes(r.id));
+        if (rooms.length < 2) { showToast('Select at least 2 rooms to compare', 'error'); return; }
+        const seasonMult = getSeasonMultiplier();
+        let html = `<table class="compare-table"><thead><tr><th>Feature</th>`;
+        rooms.forEach(r => html += `<th>${r.name}</th>`);
+        html += `</tr></thead><tbody>`;
+        html += `<tr><td><strong>Photo</strong></td>${rooms.map(r => `<td><img src="${r.image}" alt="${r.name}"></td>`).join('')}</tr>`;
+        html += `<tr><td><strong>Price/Night</strong></td>${rooms.map(r => `<td>₹${Math.round(r.price * seasonMult).toLocaleString()}</td>`).join('')}</tr>`;
+        html += `<tr><td><strong>Amenities</strong></td>${rooms.map(r => `<td>${(r.amenities || []).join('<br>')}</td>`).join('')}</tr>`;
+        html += `</tbody></table>`;
+        document.getElementById('compare-table-container').innerHTML = html;
+        document.getElementById('compare-modal').style.display = 'block';
+    });
+
     // --- Room Filters ---
     const filterPrice = document.getElementById('filter-price');
     const filterAmenity = document.getElementById('filter-amenity');
@@ -159,18 +274,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function applyFilters() {
         let filtered = [...allRooms];
-        // Price filter
         const priceVal = filterPrice.value;
         if (priceVal !== 'all') {
             const [min, max] = priceVal.split('-').map(Number);
             filtered = filtered.filter(r => r.price >= min && r.price <= max);
         }
-        // Amenity filter
         const amenityVal = filterAmenity.value;
         if (amenityVal !== 'all') {
             filtered = filtered.filter(r => r.amenities && r.amenities.includes(amenityVal));
         }
-        // Search filter
         const search = filterSearch.value.toLowerCase().trim();
         if (search) {
             filtered = filtered.filter(r =>
@@ -193,9 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const res = await apiCall('reviews');
             if (res.success && res.reviews.length > 0) reviews = res.reviews;
-        } catch (e) {
-            console.warn('Using local reviews');
-        }
+        } catch (e) { console.warn('Using local reviews'); }
         reviewsGrid.innerHTML = '';
         reviews.forEach(r => {
             const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(5 - (r.rating || 5));
@@ -216,18 +326,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ratingInput = document.getElementById('feedback-rating');
     let selectedRating = 5;
 
-    // Stars are in RTL order (5,4,3,2,1), so clicking works with CSS sibling hover
     starRating.querySelectorAll('i').forEach(star => {
         star.addEventListener('click', () => {
             selectedRating = parseInt(star.dataset.value);
             ratingInput.value = selectedRating;
-            // Update active states
             starRating.querySelectorAll('i').forEach(s => {
                 s.classList.toggle('active', parseInt(s.dataset.value) <= selectedRating);
             });
         });
     });
-    // Initialize all 5 stars active
     starRating.querySelectorAll('i').forEach(s => s.classList.add('active'));
 
     // --- Init ---
@@ -239,6 +346,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const registerModal = document.getElementById('register-modal');
     const bookingModal = document.getElementById('booking-modal');
     const profileModal = document.getElementById('profile-modal');
+    const compareModal = document.getElementById('compare-modal');
 
     document.getElementById('login-btn').addEventListener('click', () => {
         if (isLoggedIn) {
@@ -263,7 +371,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         profileModal.style.display = 'block';
         document.getElementById('profile-name').textContent = currentUser.name;
         document.getElementById('profile-phone').textContent = currentUser.phone;
-        // Load booking history
         const bookingsDiv = document.getElementById('profile-bookings');
         bookingsDiv.innerHTML = '<p>Loading...</p>';
         try {
@@ -296,7 +403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
-    // --- Registration (with password hashing) ---
+    // --- Registration ---
     document.getElementById('register-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         showLoading();
@@ -307,7 +414,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const salt = generateSalt();
             const hashedPassword = await hashPassword(password, salt);
-
             const res = await apiCall('users', 'POST', {
                 action: 'register', name, phone,
                 password: salt + ':' + hashedPassword
@@ -317,15 +423,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 registerModal.style.display = 'none';
                 saveSession({ name, phone });
                 updateLoginUI();
-                // Send welcome email if EmailJS configured
-                sendBookingEmail(name, '', 'Registration', 'N/A', 'N/A', 0);
             } else {
                 showToast(res.error || 'Registration failed!', 'error');
             }
         } catch (err) {
-            // Fallback to localStorage
             localStorage.setItem('registeredUser', JSON.stringify({ name, phone, password }));
-            showToast(`Registered (offline mode). Welcome, ${name}!`);
+            showToast(`Registered (offline). Welcome, ${name}!`);
             saveSession({ name, phone });
             registerModal.style.display = 'none';
             updateLoginUI();
@@ -333,7 +436,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         hideLoading();
     });
 
-    // --- Login (with password hashing) ---
+    // --- Login ---
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         showLoading();
@@ -354,7 +457,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const storedUser = JSON.parse(localStorage.getItem('registeredUser'));
             if (storedUser && storedUser.phone === phone && storedUser.password === password) {
                 saveSession(storedUser);
-                showToast(`Welcome back, ${currentUser.name}! (offline mode)`);
+                showToast(`Welcome back, ${currentUser.name}! (offline)`);
                 loginModal.style.display = 'none';
                 updateLoginUI();
             } else {
@@ -393,7 +496,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // --- Lightbox Gallery ---
+    // --- Lightbox ---
     const lightbox = document.getElementById('lightbox');
     const lightboxImg = document.getElementById('lightbox-img');
 
@@ -413,7 +516,47 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelector('.nav-links').classList.toggle('active');
     });
 
-    // --- Payment Flow (Modified Booking with real UPI) ---
+    // --- Date Validation (check-in/check-out) ---
+    const checkinInput = document.getElementById('checkin-date');
+    const checkoutInput = document.getElementById('checkout-date');
+    const nightCountDiv = document.getElementById('night-count');
+
+    // Set minimum check-in date to today
+    const today = new Date().toISOString().split('T')[0];
+    checkinInput.setAttribute('min', today);
+
+    checkinInput.addEventListener('change', () => {
+        // Check-out must be at least 1 day after check-in
+        const nextDay = new Date(checkinInput.value);
+        nextDay.setDate(nextDay.getDate() + 1);
+        checkoutInput.setAttribute('min', nextDay.toISOString().split('T')[0]);
+        // Reset checkout if it's before new min
+        if (checkoutInput.value && new Date(checkoutInput.value) <= new Date(checkinInput.value)) {
+            checkoutInput.value = nextDay.toISOString().split('T')[0];
+        }
+        updateNightCount();
+    });
+
+    checkoutInput.addEventListener('change', updateNightCount);
+
+    function updateNightCount() {
+        if (checkinInput.value && checkoutInput.value) {
+            const nights = Math.ceil((new Date(checkoutInput.value) - new Date(checkinInput.value)) / (1000 * 60 * 60 * 24));
+            if (nights > 0) {
+                const roomPriceEl = document.getElementById('booking-room-name');
+                const pricePerNight = parseInt(roomPriceEl.dataset.price) || 0;
+                const totalPrice = pricePerNight * nights;
+                nightCountDiv.innerHTML = `🌙 <strong>${nights} Night${nights > 1 ? 's' : ''}</strong> × ₹${pricePerNight.toLocaleString()} = ₹<strong>${totalPrice.toLocaleString()}</strong>`;
+                nightCountDiv.style.display = 'block';
+            } else {
+                nightCountDiv.style.display = 'none';
+            }
+        } else {
+            nightCountDiv.style.display = 'none';
+        }
+    }
+
+    // --- Payment Flow (with multi-night pricing, coupon, UPI, countdown, WhatsApp) ---
     const paymentModal = document.getElementById('payment-modal');
     let pendingBookingData = null;
 
@@ -428,19 +571,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         const checkin = document.getElementById('checkin-date').value;
         const checkout = document.getElementById('checkout-date').value;
 
-        let price = 0;
-        if (room.includes('Deluxe')) price = 2500;
-        if (room.includes('Executive')) price = 4500;
-        if (room.includes('Presidential')) price = 8000;
+        // Validate dates
+        if (new Date(checkin) < new Date(today)) {
+            showToast('Check-in date cannot be in the past!', 'error');
+            return;
+        }
+        if (new Date(checkout) <= new Date(checkin)) {
+            showToast('Check-out must be after check-in!', 'error');
+            return;
+        }
 
-        // Update UPI QR with real amount and UPI ID
+        // Multi-night pricing
+        const nights = Math.ceil((new Date(checkout) - new Date(checkin)) / (1000 * 60 * 60 * 24));
+        const pricePerNight = parseInt(document.getElementById('booking-room-name').dataset.price) || 0;
+        let totalPrice = pricePerNight * nights;
+
+        // Apply coupon
+        if (appliedCoupon) {
+            if (appliedCoupon.type === 'percent') {
+                totalPrice = Math.round(totalPrice * (1 - appliedCoupon.discount / 100));
+            } else {
+                totalPrice = Math.max(0, totalPrice - appliedCoupon.discount);
+            }
+        }
+
+        // Update UPI QR
         const upiId = '8541030170@upi';
-        const upiUrl = `upi://pay?pa=${upiId}&pn=GrandHotel&am=${price}&cu=INR`;
+        const upiUrl = `upi://pay?pa=${upiId}&pn=GrandHotel&am=${totalPrice}&cu=INR`;
         const qrImg = document.querySelector('.qr-code img');
         qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
-        document.getElementById('pay-amount').innerText = `₹${price}`;
+        document.getElementById('pay-amount').innerText = `₹${totalPrice.toLocaleString()} (${nights} night${nights > 1 ? 's' : ''}${appliedCoupon ? ' + ' + appliedCoupon.label : ''})`;
 
-        pendingBookingData = { name, email, dob, govt_id, room, checkin, checkout, price, status: 'Confirmed' };
+        pendingBookingData = { name, email, dob, govt_id, room, checkin, checkout, price: totalPrice, nights, status: 'Confirmed' };
 
         bookingModal.style.display = 'none';
         paymentModal.style.display = 'block';
@@ -453,39 +615,84 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const res = await apiCall('bookings', 'POST', pendingBookingData);
             if (res.success) {
-                showToast(`Payment Received! Booking Confirmed for ${pendingBookingData.name}.`);
-                // Send confirmation email
+                showToast(`Booking Confirmed for ${pendingBookingData.name}! ₹${pendingBookingData.price.toLocaleString()}`);
                 sendBookingEmail(
                     pendingBookingData.name, pendingBookingData.email,
                     pendingBookingData.room, pendingBookingData.checkin,
                     pendingBookingData.checkout, pendingBookingData.price
                 );
+                // WhatsApp notification to hotel
+                sendWhatsAppNotification(pendingBookingData);
             } else {
-                showToast('Booking saved but there was a server issue.', 'error');
+                showToast('Booking saved but server issue.', 'error');
             }
         } catch (err) {
             const bookings = JSON.parse(localStorage.getItem('bookings')) || [];
             bookings.push({ id: Date.now(), ...pendingBookingData });
             localStorage.setItem('bookings', JSON.stringify(bookings));
-            showToast(`Booking Confirmed (offline mode) for ${pendingBookingData.name}.`);
+            showToast(`Booking Confirmed (offline) for ${pendingBookingData.name}.`);
         }
 
+        // Show Countdown Timer
+        startCountdown(pendingBookingData.checkin);
+
         hideLoading();
-        paymentModal.style.display = 'none';
+        // Reset coupon
+        appliedCoupon = null;
+        document.getElementById('coupon-code').value = '';
+        document.getElementById('coupon-msg').style.display = 'none';
+        document.getElementById('night-count').style.display = 'none';
         document.getElementById('booking-form').reset();
         pendingBookingData = null;
     });
 
-    // Close modals on outside click
-    window.onclick = function (event) {
-        if (event.target == loginModal) loginModal.style.display = "none";
-        if (event.target == registerModal) registerModal.style.display = "none";
-        if (event.target == bookingModal) bookingModal.style.display = "none";
-        if (event.target == paymentModal) paymentModal.style.display = "none";
-        if (event.target == profileModal) profileModal.style.display = "none";
+    // --- Booking Countdown Timer ---
+    let countdownInterval = null;
+
+    function startCountdown(checkinDate) {
+        const countdownDiv = document.getElementById('booking-countdown');
+        countdownDiv.style.display = 'block';
+
+        if (countdownInterval) clearInterval(countdownInterval);
+
+        countdownInterval = setInterval(() => {
+            const now = new Date();
+            const target = new Date(checkinDate + 'T14:00:00'); // 2 PM check-in
+            const diff = target - now;
+
+            if (diff <= 0) {
+                clearInterval(countdownInterval);
+                countdownDiv.innerHTML = '<h4 style="color:var(--primary-color);">🎉 Check-in time has arrived! Welcome!</h4>';
+                return;
+            }
+
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+            document.getElementById('cd-days').textContent = d;
+            document.getElementById('cd-hours').textContent = h;
+            document.getElementById('cd-mins').textContent = m;
+            document.getElementById('cd-secs').textContent = s;
+        }, 1000);
     }
 
-    // --- Inquiry Form (API) ---
+    // --- WhatsApp Notification ---
+    function sendWhatsAppNotification(booking) {
+        const msg = `🏨 New Booking!\nName: ${booking.name}\nRoom: ${booking.room}\nCheck-in: ${booking.checkin}\nCheck-out: ${booking.checkout}\nAmount: ₹${booking.price.toLocaleString()}\nGovt ID: ${booking.govt_id || 'N/A'}`;
+        const whatsappUrl = `https://wa.me/918541030170?text=${encodeURIComponent(msg)}`;
+        window.open(whatsappUrl, '_blank');
+    }
+
+    // Close modals on outside click
+    window.onclick = function (event) {
+        [loginModal, registerModal, bookingModal, paymentModal, profileModal, compareModal].forEach(m => {
+            if (event.target === m) m.style.display = 'none';
+        });
+    };
+
+    // --- Inquiry Form ---
     document.getElementById('inquiry-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         showLoading();
@@ -500,13 +707,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             const inquiries = JSON.parse(localStorage.getItem('inquiries')) || [];
             inquiries.push({ id: Date.now(), name, email, message, date: new Date().toLocaleDateString() });
             localStorage.setItem('inquiries', JSON.stringify(inquiries));
-            showToast('Inquiry saved (offline mode).');
+            showToast('Inquiry saved (offline).');
         }
         hideLoading();
         e.target.reset();
     });
 
-    // --- Feedback / Review Form (API with star rating) ---
+    // --- Feedback / Review Form ---
     document.getElementById('feedback-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         showLoading();
@@ -523,41 +730,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         hideLoading();
         e.target.reset();
-        // Reset stars
         selectedRating = 5;
         ratingInput.value = 5;
         starRating.querySelectorAll('i').forEach(s => s.classList.add('active'));
     });
 
     // --- Email Confirmation (EmailJS) ---
-    // Users need to set up EmailJS with their own service_id, template_id, and public_key
-    // Visit https://www.emailjs.com/ to set up a free account
     function sendBookingEmail(name, email, room, checkin, checkout, price) {
         try {
             if (typeof emailjs !== 'undefined' && email) {
                 emailjs.send('service_hotel', 'template_booking', {
-                    to_email: email,
-                    guest_name: name,
-                    room_type: room,
-                    checkin_date: checkin,
-                    checkout_date: checkout,
+                    to_email: email, guest_name: name, room_type: room,
+                    checkin_date: checkin, checkout_date: checkout,
                     amount: `₹${price}`
-                }, 'YOUR_PUBLIC_KEY'); // Replace with your EmailJS public key
-                console.log('Booking confirmation email sent');
+                }, 'YOUR_PUBLIC_KEY');
             }
-        } catch (e) {
-            console.log('EmailJS not configured:', e.message);
-        }
+        } catch (e) { console.log('EmailJS not configured:', e.message); }
     }
 
     // --- Scroll Animation ---
     const revealElements = document.querySelectorAll('.reveal');
     const revealOnScroll = () => {
         revealElements.forEach(el => {
-            const top = el.getBoundingClientRect().top;
-            if (top < window.innerHeight - 100) {
-                el.classList.add('active');
-            }
+            if (el.getBoundingClientRect().top < window.innerHeight - 100) el.classList.add('active');
         });
     };
     window.addEventListener('scroll', revealOnScroll);
