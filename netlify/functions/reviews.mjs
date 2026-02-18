@@ -9,8 +9,7 @@ export default async (req) => {
             const { name, text, rating } = await req.json();
 
             const result = await sql`
-        INSERT INTO reviews (name, text, rating)
-        VALUES (${name}, ${text}, ${rating || 5})
+        INSERT INTO reviews (name, text, rating) VALUES (${name}, ${text}, ${rating || 5})
         RETURNING *
       `;
 

@@ -21,6 +21,11 @@
 
 <body>
 
+    <!-- Loading Spinner -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+
     <!-- Header -->
     <header id="header">
         <div class="container header-container">
@@ -43,6 +48,8 @@
                 </select>
                 <button id="register-btn" class="btn btn-primary" data-i18n="btn_register">Register</button>
                 <button id="login-btn" class="btn btn-outline" data-i18n="btn_login">Login</button>
+                <button id="profile-btn" class="btn btn-outline" style="display:none;" title="My Profile"><i
+                        class="fas fa-user-circle"></i></button>
             </div>
             <button id="dark-mode-toggle" class="btn btn-outline" title="Toggle Dark Mode"><i
                     class="fas fa-moon"></i></button>
@@ -68,6 +75,25 @@
             <div class="section-header">
                 <h3 data-i18n="section_rooms_title">Our Rooms</h3>
                 <p data-i18n="section_rooms_subtitle">Select your comfort.</p>
+            </div>
+            <!-- Room Filters -->
+            <div class="room-filters">
+                <select id="filter-price">
+                    <option value="all">All Prices</option>
+                    <option value="0-3000">Under ₹3,000</option>
+                    <option value="3000-6000">₹3,000 - ₹6,000</option>
+                    <option value="6000-99999">₹6,000+</option>
+                </select>
+                <select id="filter-amenity">
+                    <option value="all">All Amenities</option>
+                    <option value="King Bed">King Bed</option>
+                    <option value="Ocean View">Ocean View</option>
+                    <option value="Private Pool">Private Pool</option>
+                    <option value="Free Wifi">Free Wifi</option>
+                    <option value="Mini Bar">Mini Bar</option>
+                    <option value="Jacuzzi">Jacuzzi</option>
+                </select>
+                <input type="text" id="filter-search" placeholder="Search rooms...">
             </div>
             <div id="rooms-grid" class="rooms-grid">
                 <!-- Rooms will be injected via JS -->
@@ -114,6 +140,15 @@
                 <form id="feedback-form">
                     <input type="text" id="feedback-name" placeholder="Your Name" required>
                     <textarea id="feedback-text" placeholder="Your Feedback" required></textarea>
+                    <!-- Interactive Star Rating -->
+                    <div class="star-rating" id="star-rating">
+                        <i class="fas fa-star" data-value="5"></i>
+                        <i class="fas fa-star" data-value="4"></i>
+                        <i class="fas fa-star" data-value="3"></i>
+                        <i class="fas fa-star" data-value="2"></i>
+                        <i class="fas fa-star" data-value="1"></i>
+                    </div>
+                    <input type="hidden" id="feedback-rating" value="5">
                     <button type="submit" class="btn btn-secondary" data-i18n="btn_submit">Submit</button>
                 </form>
             </div>
@@ -213,7 +248,7 @@
             <div class="qr-container">
                 <p>Scan to Pay with Any UPI App</p>
                 <div class="qr-code">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=grandhotel@upi&pn=GrandHotel&am=1&cu=INR"
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=8541030170@upi%26pn=GrandHotel%26am=1%26cu=INR"
                         alt="UPI QR">
                 </div>
                 <p>Amount: <strong id="pay-amount">₹0</strong></p>
@@ -227,6 +262,26 @@
         <span class="lightbox-close">&times;</span>
         <img id="lightbox-img" src="" alt="Gallery">
     </div>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2><i class="fas fa-user-circle"></i> My Profile</h2>
+            <div class="profile-section">
+                <h4>Account Details</h4>
+                <p><strong>Name:</strong> <span id="profile-name">—</span></p>
+                <p><strong>Phone:</strong> <span id="profile-phone">—</span></p>
+            </div>
+            <div class="profile-section">
+                <h4>Booking History</h4>
+                <div id="profile-bookings">No bookings yet.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EmailJS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
     <!-- Scripts -->
     <script src="js/data.js"></script>

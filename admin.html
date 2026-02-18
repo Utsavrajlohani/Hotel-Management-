@@ -5,16 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grand Hotel - Admin Panel</title>
-    <!-- Fonts -->
     <link
         href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:wght@400;600;700&display=swap"
         rel="stylesheet">
-    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Favicon -->
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/763/763812.png" type="image/png">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/admin.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 
 <body>
@@ -58,26 +57,41 @@
                         <h3>Revenue (Est.)</h3>
                         <p id="total-revenue">₹0</p>
                     </div>
+                    <div class="stat-card">
+                        <h3>Total Users</h3>
+                        <p id="total-users">0</p>
+                    </div>
+                </div>
+                <!-- Revenue Chart -->
+                <div class="chart-container">
+                    <h3>Revenue by Room Type</h3>
+                    <canvas id="revenue-chart" height="120"></canvas>
                 </div>
             </section>
 
             <!-- Bookings Tab -->
             <section id="bookings" class="tab-content">
+                <div class="admin-action-bar">
+                    <button class="btn-export" onclick="exportBookingsCSV()"><i class="fas fa-file-csv"></i> Export
+                        Bookings CSV</button>
+                </div>
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <th>Guest Name</th>
+                                <th>Guest</th>
                                 <th>Room</th>
+                                <th>DOB</th>
+                                <th>Govt ID</th>
                                 <th>Check-In</th>
                                 <th>Check-Out</th>
+                                <th>Amount</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="bookings-table-body">
-                            <!-- Injected via JS -->
                         </tbody>
                     </table>
                 </div>
@@ -85,6 +99,10 @@
 
             <!-- Inquiries Tab -->
             <section id="inquiries" class="tab-content">
+                <div class="admin-action-bar">
+                    <button class="btn-export" onclick="exportInquiriesCSV()"><i class="fas fa-file-csv"></i> Export
+                        Inquiries CSV</button>
+                </div>
                 <div class="table-container">
                     <table>
                         <thead>
@@ -97,7 +115,6 @@
                             </tr>
                         </thead>
                         <tbody id="inquiries-table-body">
-                            <!-- Injected via JS -->
                         </tbody>
                     </table>
                 </div>
@@ -109,8 +126,18 @@
     <div id="admin-login-overlay" class="login-overlay">
         <div class="login-box">
             <h2>Admin Access</h2>
-            <input type="password" id="admin-pin" placeholder="Enter PIN (1234)">
+            <input type="password" id="admin-pin" placeholder="Enter PIN">
             <button id="admin-login-btn" class="btn btn-primary">Unlock</button>
+        </div>
+    </div>
+
+    <!-- Govt ID Viewer Modal -->
+    <div id="govtid-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal"
+                onclick="document.getElementById('govtid-modal').style.display='none'">&times;</span>
+            <h2>Government ID</h2>
+            <img id="govtid-image" class="govtid-preview" src="" alt="Govt ID">
         </div>
     </div>
 

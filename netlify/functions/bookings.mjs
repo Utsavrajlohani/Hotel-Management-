@@ -22,6 +22,15 @@ export default async (req) => {
             return new Response(JSON.stringify({ success: true, bookings }), { status: 200, headers });
         }
 
+        if (req.method === 'PUT') {
+            const { id, status } = await req.json();
+            if (!id || !status) {
+                return new Response(JSON.stringify({ success: false, error: 'Missing id or status' }), { status: 400, headers });
+            }
+            await sql`UPDATE bookings SET status = ${status} WHERE id = ${id}`;
+            return new Response(JSON.stringify({ success: true, message: 'Status updated' }), { status: 200, headers });
+        }
+
         if (req.method === 'DELETE') {
             const url = new URL(req.url);
             const id = url.searchParams.get('id');

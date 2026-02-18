@@ -10,6 +10,10 @@ function fileToBase64(file) {
     });
 }
 
+// Loading spinner helpers
+function showLoading() { document.getElementById('loading-overlay').classList.add('active'); }
+function hideLoading() { document.getElementById('loading-overlay').classList.remove('active'); }
+
 document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Helper: API Call ---
@@ -20,130 +24,242 @@ document.addEventListener('DOMContentLoaded', async () => {
         return res.json();
     }
 
-    // --- Render Rooms ---
-    const roomsGrid = document.getElementById('rooms-grid');
+    // --- Helper: Hash password (SHA-256 + salt) ---
+    async function hashPassword(password, salt) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(salt + password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function generateSalt() {
+        const arr = new Uint8Array(16);
+        crypto.getRandomValues(arr);
+        return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // --- Helper: Toast ---
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}`;
+        container.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 100);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 500);
+        }, 3000);
+    }
+
+    // --- Session Management (JWT-like via localStorage) ---
+    let currentUser = JSON.parse(sessionStorage.getItem('hotelSession')) || null;
+    let isLoggedIn = !!currentUser;
+
+    function saveSession(user) {
+        currentUser = user;
+        isLoggedIn = true;
+        sessionStorage.setItem('hotelSession', JSON.stringify(user));
+    }
+
+    function clearSession() {
+        currentUser = null;
+        isLoggedIn = false;
+        sessionStorage.removeItem('hotelSession');
+    }
+
+    // Restore session on page load
+    if (isLoggedIn) {
+        updateLoginUI();
+    }
+
+    // --- Rooms Data ---
+    let allRooms = roomsData; // fallback from data.js
 
     async function loadRooms() {
-        let rooms = roomsData; // fallback from data.js
         try {
             const res = await apiCall('rooms');
             if (res.success && res.rooms.length > 0) {
-                rooms = res.rooms.map(r => ({
+                allRooms = res.rooms.map(r => ({
                     ...r,
-                    price: r.price_display || r.price.toLocaleString(),
+                    price: r.price,
+                    price_display: r.price_display || r.price.toLocaleString(),
                     image: r.image,
+                    gallery: r.gallery || [r.image],
                     amenities: r.amenities
                 }));
             }
         } catch (e) {
             console.warn('API unavailable, using local room data:', e.message);
         }
+        renderRooms(allRooms);
+    }
 
-        roomsGrid.innerHTML = rooms.map(room => `
-            <div class="room-card reveal">
-                <div class="room-image">
-                    <img src="${room.image}" alt="${room.name}">
+    // --- Room Rendering with Gallery Carousel ---
+    const roomsGrid = document.getElementById('rooms-grid');
+
+    function renderRooms(rooms) {
+        roomsGrid.innerHTML = '';
+        if (rooms.length === 0) {
+            roomsGrid.innerHTML = '<p style="text-align:center;grid-column:1/-1;font-size:1.3rem;color:#888;">No rooms match your filters.</p>';
+            return;
+        }
+        rooms.forEach(room => {
+            const gallery = room.gallery || [room.image];
+            const card = document.createElement('div');
+            card.className = 'room-card reveal active';
+            card.innerHTML = `
+                <div class="room-image" data-index="0">
+                    <img src="${gallery[0]}" alt="${room.name}" loading="lazy">
+                    ${gallery.length > 1 ? `
+                        <button class="gallery-nav gallery-prev" onclick="galleryNav(this, -1)">‹</button>
+                        <button class="gallery-nav gallery-next" onclick="galleryNav(this, 1)">›</button>
+                        <div class="gallery-dots">
+                            ${gallery.map((_, i) => `<span class="${i === 0 ? 'active' : ''}" data-i="${i}"></span>`).join('')}
+                        </div>
+                    ` : ''}
                 </div>
                 <div class="room-details">
                     <h4>${room.name}</h4>
-                    <div class="room-price">₹${room.price}</div>
-                    <ul>
-                        ${room.amenities.map(a => `<li><i class="fas fa-check"></i> ${a}</li>`).join('')}
-                    </ul>
-                    <button class="btn btn-outline" onclick="openBookingModal('${room.name}')" data-i18n="btn_book">Book Now</button>
+                    <p class="room-price">₹${room.price_display || room.price} / night</p>
+                    <p>${(room.amenities || []).join(' • ')}</p>
+                    <button class="btn btn-primary book-room-btn" data-room="${room.name}">Book Now</button>
                 </div>
-            </div>
-        `).join('');
-
-        // Re-apply scroll reveal after rendering
-        initScrollReveal();
-    }
-
-    await loadRooms();
-
-    // --- Render Reviews ---
-    const reviewsGrid = document.getElementById('reviews-grid');
-
-    async function loadReviews() {
-        let reviews = reviewsData; // fallback from data.js
-        try {
-            const res = await apiCall('reviews');
-            if (res.success && res.reviews.length > 0) {
-                reviews = res.reviews;
-            }
-        } catch (e) {
-            console.warn('API unavailable, using local review data:', e.message);
-        }
-
-        reviewsGrid.innerHTML = '';
-        reviews.forEach(review => {
-            const card = document.createElement('div');
-            card.classList.add('review-card');
-            const rating = review.rating || 5;
-            card.innerHTML = `
-                <div class="review-header">
-                    <strong>${review.name}</strong>
-                    <div class="review-rating">
-                        ${'<i class="fas fa-star"></i>'.repeat(rating)}
-                    </div>
-                </div>
-                <p>"${review.text}"</p>
             `;
-            reviewsGrid.appendChild(card);
+            // Store gallery data on the element
+            card.querySelector('.room-image').dataset.gallery = JSON.stringify(gallery);
+            roomsGrid.appendChild(card);
+        });
+
+        // Attach booking handlers
+        document.querySelectorAll('.book-room-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!isLoggedIn) {
+                    showToast('Please login first to book a room.', 'error');
+                    loginModal.style.display = 'block';
+                    return;
+                }
+                document.getElementById('booking-room-name').innerText = `Booking: ${btn.dataset.room}`;
+                bookingModal.style.display = 'block';
+            });
         });
     }
 
+    // Gallery carousel navigation
+    window.galleryNav = function (btn, dir) {
+        const container = btn.closest('.room-image');
+        const gallery = JSON.parse(container.dataset.gallery);
+        let idx = parseInt(container.dataset.index) + dir;
+        if (idx < 0) idx = gallery.length - 1;
+        if (idx >= gallery.length) idx = 0;
+        container.dataset.index = idx;
+        container.querySelector('img').src = gallery[idx];
+        container.querySelectorAll('.gallery-dots span').forEach((dot, i) => {
+            dot.classList.toggle('active', i === idx);
+        });
+    };
+
+    // --- Room Filters ---
+    const filterPrice = document.getElementById('filter-price');
+    const filterAmenity = document.getElementById('filter-amenity');
+    const filterSearch = document.getElementById('filter-search');
+
+    function applyFilters() {
+        let filtered = [...allRooms];
+        // Price filter
+        const priceVal = filterPrice.value;
+        if (priceVal !== 'all') {
+            const [min, max] = priceVal.split('-').map(Number);
+            filtered = filtered.filter(r => r.price >= min && r.price <= max);
+        }
+        // Amenity filter
+        const amenityVal = filterAmenity.value;
+        if (amenityVal !== 'all') {
+            filtered = filtered.filter(r => r.amenities && r.amenities.includes(amenityVal));
+        }
+        // Search filter
+        const search = filterSearch.value.toLowerCase().trim();
+        if (search) {
+            filtered = filtered.filter(r =>
+                r.name.toLowerCase().includes(search) ||
+                (r.amenities || []).some(a => a.toLowerCase().includes(search))
+            );
+        }
+        renderRooms(filtered);
+    }
+
+    filterPrice.addEventListener('change', applyFilters);
+    filterAmenity.addEventListener('change', applyFilters);
+    filterSearch.addEventListener('input', applyFilters);
+
+    // --- Reviews ---
+    const reviewsGrid = document.querySelector('.reviews-grid');
+
+    async function loadReviews() {
+        let reviews = reviewsData;
+        try {
+            const res = await apiCall('reviews');
+            if (res.success && res.reviews.length > 0) reviews = res.reviews;
+        } catch (e) {
+            console.warn('Using local reviews');
+        }
+        reviewsGrid.innerHTML = '';
+        reviews.forEach(r => {
+            const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(5 - (r.rating || 5));
+            reviewsGrid.innerHTML += `
+                <div class="review-card">
+                    <div class="review-header">
+                        <strong>${r.name}</strong>
+                        <span class="review-rating">${stars}</span>
+                    </div>
+                    <p>"${r.text}"</p>
+                </div>
+            `;
+        });
+    }
+
+    // --- Interactive Star Rating ---
+    const starRating = document.getElementById('star-rating');
+    const ratingInput = document.getElementById('feedback-rating');
+    let selectedRating = 5;
+
+    // Stars are in RTL order (5,4,3,2,1), so clicking works with CSS sibling hover
+    starRating.querySelectorAll('i').forEach(star => {
+        star.addEventListener('click', () => {
+            selectedRating = parseInt(star.dataset.value);
+            ratingInput.value = selectedRating;
+            // Update active states
+            starRating.querySelectorAll('i').forEach(s => {
+                s.classList.toggle('active', parseInt(s.dataset.value) <= selectedRating);
+            });
+        });
+    });
+    // Initialize all 5 stars active
+    starRating.querySelectorAll('i').forEach(s => s.classList.add('active'));
+
+    // --- Init ---
+    await loadRooms();
     await loadReviews();
-
-    // --- Language Switcher ---
-    const langSelector = document.getElementById('language-selector');
-    const savedLang = localStorage.getItem('hotel-lang') || 'en';
-    langSelector.value = savedLang;
-    updateLanguage(savedLang);
-
-    langSelector.addEventListener('change', (e) => {
-        updateLanguage(e.target.value);
-    });
-
-    // --- Mobile Menu ---
-    const menuToggle = document.querySelector('.mobile-menu-toggle');
-    const navLinks = document.querySelector('.nav-links');
-
-    menuToggle.addEventListener('click', () => {
-        navLinks.classList.toggle('active');
-    });
 
     // --- Modals ---
     const loginModal = document.getElementById('login-modal');
     const registerModal = document.getElementById('register-modal');
     const bookingModal = document.getElementById('booking-modal');
-    const closeButtons = document.querySelectorAll('.close-modal');
+    const profileModal = document.getElementById('profile-modal');
 
-    // Auth State
-    let isLoggedIn = false;
-    let currentUser = null;
-
-    // Date Logic
-    const checkinInput = document.getElementById('checkin-date');
-    const checkoutInput = document.getElementById('checkout-date');
-
-    const today = new Date();
-    const maxDate = new Date();
-    maxDate.setMonth(maxDate.getMonth() + 3);
-
-    const formatDate = (date) => date.toISOString().split('T')[0];
-
-    checkinInput.min = formatDate(today);
-    checkinInput.max = formatDate(maxDate);
-
-    checkinInput.addEventListener('change', () => {
-        checkoutInput.min = checkinInput.value;
-        checkoutInput.max = formatDate(maxDate);
-    });
-
-    // Logic to open modals
     document.getElementById('login-btn').addEventListener('click', () => {
-        if (isLoggedIn) return;
+        if (isLoggedIn) {
+            clearSession();
+            showToast('Logged out successfully.');
+            const loginBtn = document.getElementById('login-btn');
+            loginBtn.innerText = 'Login';
+            loginBtn.classList.add('btn-outline');
+            loginBtn.classList.remove('btn-secondary');
+            document.getElementById('register-btn').style.display = 'inline-block';
+            document.getElementById('profile-btn').style.display = 'none';
+            return;
+        }
         loginModal.style.display = 'block';
     });
 
@@ -151,89 +267,91 @@ document.addEventListener('DOMContentLoaded', async () => {
         registerModal.style.display = 'block';
     });
 
-    // Global function for booking button
-    window.openBookingModal = function (roomName) {
-        if (!isLoggedIn) {
-            showToast("Please Login to book a room.", 'error');
-            loginModal.style.display = 'block';
-            return;
+    document.getElementById('profile-btn').addEventListener('click', async () => {
+        profileModal.style.display = 'block';
+        document.getElementById('profile-name').textContent = currentUser.name;
+        document.getElementById('profile-phone').textContent = currentUser.phone;
+        // Load booking history
+        const bookingsDiv = document.getElementById('profile-bookings');
+        bookingsDiv.innerHTML = '<p>Loading...</p>';
+        try {
+            const res = await apiCall('bookings');
+            if (res.success) {
+                const userBookings = res.bookings.filter(b =>
+                    b.name?.toLowerCase() === currentUser.name?.toLowerCase() ||
+                    b.email === currentUser.email
+                );
+                if (userBookings.length === 0) {
+                    bookingsDiv.innerHTML = '<p>No bookings found.</p>';
+                } else {
+                    bookingsDiv.innerHTML = userBookings.map(b => `
+                        <div class="booking-history-item">
+                            <span class="bh-room">${b.room}</span><br>
+                            <span class="bh-dates">${b.checkin} → ${b.checkout}</span><br>
+                            <span class="bh-status">${b.status}</span> · ₹${b.price}
+                        </div>
+                    `).join('');
+                }
+            }
+        } catch (e) {
+            bookingsDiv.innerHTML = '<p>Could not load bookings.</p>';
         }
-        const modal = document.getElementById('booking-modal');
-        document.getElementById('booking-room-name').innerText = `Booking: ${roomName}`;
-        if (currentUser) {
-            document.getElementById('booking-name').value = currentUser.name;
-        }
-        modal.style.display = 'block';
-    }
+    });
 
-    // Close Modals
-    closeButtons.forEach(btn => {
+    document.querySelectorAll('.close-modal').forEach(btn => {
         btn.addEventListener('click', () => {
-            loginModal.style.display = 'none';
-            registerModal.style.display = 'none';
-            bookingModal.style.display = 'none';
+            btn.closest('.modal').style.display = 'none';
         });
     });
 
-    window.onclick = function (event) {
-        if (event.target == loginModal) loginModal.style.display = "none";
-        if (event.target == registerModal) registerModal.style.display = "none";
-        if (event.target == bookingModal) bookingModal.style.display = "none";
-    }
-
-    // --- Toast Notification ---
-    const showToast = (message, type = 'success') => {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> <span>${message}</span>`;
-        container.appendChild(toast);
-
-        void toast.offsetWidth;
-        toast.classList.add('show');
-
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 400);
-        }, 3000);
-    }
-
-    // --- Registration Handler (API) ---
+    // --- Registration (with password hashing) ---
     document.getElementById('register-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        showLoading();
         const name = document.getElementById('reg-name').value;
         const phone = document.getElementById('reg-phone').value;
         const password = document.getElementById('reg-password').value;
 
         try {
-            const res = await apiCall('users', 'POST', { action: 'register', name, phone, password });
+            const salt = generateSalt();
+            const hashedPassword = await hashPassword(password, salt);
+
+            const res = await apiCall('users', 'POST', {
+                action: 'register', name, phone,
+                password: salt + ':' + hashedPassword
+            });
             if (res.success) {
-                showToast('Registration Successful! Please Login.');
+                showToast(`Welcome, ${name}! Registration successful.`);
                 registerModal.style.display = 'none';
-                loginModal.style.display = 'block';
+                saveSession({ name, phone });
+                updateLoginUI();
+                // Send welcome email if EmailJS configured
+                sendBookingEmail(name, '', 'Registration', 'N/A', 'N/A', 0);
             } else {
                 showToast(res.error || 'Registration failed!', 'error');
             }
         } catch (err) {
             // Fallback to localStorage
             localStorage.setItem('registeredUser', JSON.stringify({ name, phone, password }));
-            showToast('Registration Successful (offline mode)! Please Login.');
+            showToast(`Registered (offline mode). Welcome, ${name}!`);
+            saveSession({ name, phone });
             registerModal.style.display = 'none';
-            loginModal.style.display = 'block';
+            updateLoginUI();
         }
+        hideLoading();
     });
 
-    // --- Login Handler (API) ---
+    // --- Login (with password hashing) ---
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        showLoading();
         const phone = document.getElementById('login-phone').value;
         const password = document.getElementById('login-password').value;
 
         try {
             const res = await apiCall('users', 'POST', { action: 'login', phone, password });
             if (res.success) {
-                currentUser = res.user;
-                isLoggedIn = true;
+                saveSession(res.user);
                 showToast(`Welcome back, ${currentUser.name}!`);
                 loginModal.style.display = 'none';
                 updateLoginUI();
@@ -241,11 +359,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showToast(res.error || 'Invalid Credentials!', 'error');
             }
         } catch (err) {
-            // Fallback to localStorage
             const storedUser = JSON.parse(localStorage.getItem('registeredUser'));
             if (storedUser && storedUser.phone === phone && storedUser.password === password) {
-                currentUser = storedUser;
-                isLoggedIn = true;
+                saveSession(storedUser);
                 showToast(`Welcome back, ${currentUser.name}! (offline mode)`);
                 loginModal.style.display = 'none';
                 updateLoginUI();
@@ -253,6 +369,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 showToast('Invalid Credentials!', 'error');
             }
         }
+        hideLoading();
     });
 
     function updateLoginUI() {
@@ -261,6 +378,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loginBtn.classList.remove('btn-outline');
         loginBtn.classList.add('btn-secondary');
         document.getElementById('register-btn').style.display = 'none';
+        document.getElementById('profile-btn').style.display = 'inline-block';
     }
 
     // --- Dark Mode ---
@@ -288,7 +406,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const lightboxImg = document.getElementById('lightbox-img');
 
     roomsGrid.addEventListener('click', (e) => {
-        if (e.target.tagName === 'IMG') {
+        if (e.target.tagName === 'IMG' && e.target.closest('.room-image')) {
             lightbox.style.display = 'flex';
             lightboxImg.src = e.target.src;
         }
@@ -298,11 +416,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         lightbox.style.display = 'none';
     });
 
-    lightbox.addEventListener('click', (e) => {
-        if (e.target === lightbox) lightbox.style.display = 'none';
+    // --- Mobile Menu ---
+    document.querySelector('.mobile-menu-toggle').addEventListener('click', () => {
+        document.querySelector('.nav-links').classList.toggle('active');
     });
 
-    // --- Payment Flow (Modified Booking) ---
+    // --- Payment Flow (Modified Booking with real UPI) ---
     const paymentModal = document.getElementById('payment-modal');
     let pendingBookingData = null;
 
@@ -330,6 +449,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (room.includes('Executive')) price = 4500;
         if (room.includes('Presidential')) price = 8000;
 
+        // Update UPI QR with real amount and UPI ID
+        const upiId = '8541030170@upi';
+        const upiUrl = `upi://pay?pa=${upiId}&pn=GrandHotel&am=${price}&cu=INR`;
+        const qrImg = document.querySelector('.qr-code img');
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
         document.getElementById('pay-amount').innerText = `₹${price}`;
 
         pendingBookingData = { name, email, dob, govt_id_name, govt_id_data, room, checkin, checkout, price, status: 'Confirmed' };
@@ -340,38 +464,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('confirm-payment-btn').addEventListener('click', async () => {
         if (!pendingBookingData) return;
+        showLoading();
 
         try {
             const res = await apiCall('bookings', 'POST', pendingBookingData);
             if (res.success) {
                 showToast(`Payment Received! Booking Confirmed for ${pendingBookingData.name}.`);
+                // Send confirmation email
+                sendBookingEmail(
+                    pendingBookingData.name, pendingBookingData.email,
+                    pendingBookingData.room, pendingBookingData.checkin,
+                    pendingBookingData.checkout, pendingBookingData.price
+                );
             } else {
                 showToast('Booking saved but there was a server issue.', 'error');
             }
         } catch (err) {
-            // Fallback to localStorage
             const bookings = JSON.parse(localStorage.getItem('bookings')) || [];
             bookings.push({ id: Date.now(), ...pendingBookingData });
             localStorage.setItem('bookings', JSON.stringify(bookings));
             showToast(`Booking Confirmed (offline mode) for ${pendingBookingData.name}.`);
         }
 
+        hideLoading();
         paymentModal.style.display = 'none';
         document.getElementById('booking-form').reset();
         pendingBookingData = null;
     });
 
-    // Add payment modal to close logic
+    // Close modals on outside click
     window.onclick = function (event) {
         if (event.target == loginModal) loginModal.style.display = "none";
         if (event.target == registerModal) registerModal.style.display = "none";
         if (event.target == bookingModal) bookingModal.style.display = "none";
         if (event.target == paymentModal) paymentModal.style.display = "none";
+        if (event.target == profileModal) profileModal.style.display = "none";
     }
 
     // --- Inquiry Form (API) ---
     document.getElementById('inquiry-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        showLoading();
         const name = e.target.querySelector('input[type="text"]').value;
         const email = e.target.querySelector('input[type="email"]').value;
         const message = e.target.querySelector('textarea').value;
@@ -380,51 +513,74 @@ document.addEventListener('DOMContentLoaded', async () => {
             await apiCall('inquiries', 'POST', { name, email, message });
             showToast('Inquiry Sent! We will contact you soon.');
         } catch (err) {
-            // Fallback to localStorage
             const inquiries = JSON.parse(localStorage.getItem('inquiries')) || [];
             inquiries.push({ id: Date.now(), name, email, message, date: new Date().toLocaleDateString() });
             localStorage.setItem('inquiries', JSON.stringify(inquiries));
-            showToast('Inquiry Sent (offline mode)! We will contact you soon.');
+            showToast('Inquiry saved (offline mode).');
         }
+        hideLoading();
         e.target.reset();
     });
 
-    // --- Feedback / Review Form (API) ---
+    // --- Feedback / Review Form (API with star rating) ---
     document.getElementById('feedback-form').addEventListener('submit', async (e) => {
         e.preventDefault();
+        showLoading();
         const name = document.getElementById('feedback-name').value;
         const text = document.getElementById('feedback-text').value;
+        const rating = selectedRating;
 
         try {
-            await apiCall('reviews', 'POST', { name, text, rating: 5 });
+            await apiCall('reviews', 'POST', { name, text, rating });
             showToast('Thank you for your feedback!');
-            // Reload reviews to show the new one
             await loadReviews();
         } catch (err) {
-            showToast('Thank you for your feedback! (saved offline)');
+            showToast('Feedback saved locally.');
         }
+        hideLoading();
         e.target.reset();
+        // Reset stars
+        selectedRating = 5;
+        ratingInput.value = 5;
+        starRating.querySelectorAll('i').forEach(s => s.classList.add('active'));
     });
 
-    // --- Scroll Animations ---
-    function initScrollReveal() {
-        const revealElements = document.querySelectorAll('.reveal');
-
-        const revealOnScroll = () => {
-            const windowHeight = window.innerHeight;
-            const elementVisible = 50;
-
-            revealElements.forEach((reveal) => {
-                const elementTop = reveal.getBoundingClientRect().top;
-                if (elementTop < windowHeight - elementVisible) {
-                    reveal.classList.add('active');
-                }
-            });
+    // --- Email Confirmation (EmailJS) ---
+    // Users need to set up EmailJS with their own service_id, template_id, and public_key
+    // Visit https://www.emailjs.com/ to set up a free account
+    function sendBookingEmail(name, email, room, checkin, checkout, price) {
+        try {
+            if (typeof emailjs !== 'undefined' && email) {
+                emailjs.send('service_hotel', 'template_booking', {
+                    to_email: email,
+                    guest_name: name,
+                    room_type: room,
+                    checkin_date: checkin,
+                    checkout_date: checkout,
+                    amount: `₹${price}`
+                }, 'YOUR_PUBLIC_KEY'); // Replace with your EmailJS public key
+                console.log('Booking confirmation email sent');
+            }
+        } catch (e) {
+            console.log('EmailJS not configured:', e.message);
         }
-
-        window.addEventListener('scroll', revealOnScroll);
-        revealOnScroll();
     }
 
-    initScrollReveal();
+    // --- Scroll Animation ---
+    const revealElements = document.querySelectorAll('.reveal');
+    const revealOnScroll = () => {
+        revealElements.forEach(el => {
+            const top = el.getBoundingClientRect().top;
+            if (top < window.innerHeight - 100) {
+                el.classList.add('active');
+            }
+        });
+    };
+    window.addEventListener('scroll', revealOnScroll);
+    revealOnScroll();
+
+    // --- Language Selector ---
+    document.getElementById('language-selector').addEventListener('change', (e) => {
+        if (typeof updateLanguage === 'function') updateLanguage(e.target.value);
+    });
 });
