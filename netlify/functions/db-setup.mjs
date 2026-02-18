@@ -1,11 +1,11 @@
 import { neon } from '@netlify/neon';
 
 export default async (req) => {
-    const sql = neon();
+  const sql = neon();
 
-    try {
-        // Create tables
-        await sql`
+  try {
+    // Create tables
+    await sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -15,7 +15,7 @@ export default async (req) => {
       )
     `;
 
-        await sql`
+    await sql`
       CREATE TABLE IF NOT EXISTS rooms (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -26,7 +26,7 @@ export default async (req) => {
       )
     `;
 
-        await sql`
+    await sql`
       CREATE TABLE IF NOT EXISTS bookings (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -41,7 +41,7 @@ export default async (req) => {
       )
     `;
 
-        await sql`
+    await sql`
       CREATE TABLE IF NOT EXISTS inquiries (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -51,7 +51,7 @@ export default async (req) => {
       )
     `;
 
-        await sql`
+    await sql`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -61,36 +61,36 @@ export default async (req) => {
       )
     `;
 
-        // Seed rooms if empty
-        const existingRooms = await sql`SELECT COUNT(*) as count FROM rooms`;
-        if (parseInt(existingRooms[0].count) === 0) {
-            await sql`
+    // Seed rooms if empty
+    const existingRooms = await sql`SELECT COUNT(*) as count FROM rooms`;
+    if (parseInt(existingRooms[0].count) === 0) {
+      await sql`
         INSERT INTO rooms (name, price, price_display, image, amenities) VALUES
-        ('Deluxe King Room', 2500, '2,500', 'https://placehold.co/600x400/800020/D4AF37?text=Deluxe+King+Room', ARRAY['King Bed', 'City View', 'Free Wifi']),
-        ('Executive Suite', 4500, '4,500', 'https://placehold.co/600x400/800020/D4AF37?text=Executive+Suite', ARRAY['Living Area', 'Ocean View', 'Mini Bar']),
-        ('Presidential Suite', 8000, '8,000', 'https://placehold.co/600x400/800020/D4AF37?text=Presidential+Suite', ARRAY['Private Pool', 'Butler Service', 'Jacuzzi'])
+        ('Deluxe King Room', 2500, '2,500', 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&h=400&fit=crop&q=80', ARRAY['King Bed', 'City View', 'Free Wifi']),
+        ('Executive Suite', 4500, '4,500', 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=400&fit=crop&q=80', ARRAY['Living Area', 'Ocean View', 'Mini Bar']),
+        ('Presidential Suite', 8000, '8,000', 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=600&h=400&fit=crop&q=80', ARRAY['Private Pool', 'Butler Service', 'Jacuzzi'])
       `;
-        }
+    }
 
-        // Seed default reviews if empty
-        const existingReviews = await sql`SELECT COUNT(*) as count FROM reviews`;
-        if (parseInt(existingReviews[0].count) === 0) {
-            await sql`
+    // Seed default reviews if empty
+    const existingReviews = await sql`SELECT COUNT(*) as count FROM reviews`;
+    if (parseInt(existingReviews[0].count) === 0) {
+      await sql`
         INSERT INTO reviews (name, text, rating) VALUES
         ('Vikram Rathore', 'A truly royal experience. The suite was magnificent.', 5),
         ('Ananya Desai', 'Beautiful architecture and warm hospitality. Felt like a palace.', 4),
         ('Rajesh Hamal', 'Best hotel in Kathmandu. Highly recommended for luxury stay!', 5)
       `;
-        }
-
-        return new Response(JSON.stringify({ success: true, message: 'Database initialized successfully!' }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    } catch (error) {
-        return new Response(JSON.stringify({ success: false, error: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        });
     }
+
+    return new Response(JSON.stringify({ success: true, message: 'Database initialized successfully!' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 };

@@ -3,21 +3,21 @@ const roomsData = [
         id: 1,
         name: "Deluxe King Room",
         price: '2,500',
-        image: "https://placehold.co/600x400/800020/D4AF37?text=Deluxe+King+Room",
+        image: "https://images.unsplash.com/photo-1611892440504-42a792e24d32?w=600&h=400&fit=crop&q=80",
         amenities: ["King Bed", "City View", "Free Wifi"]
     },
     {
         id: 2,
         name: "Executive Suite",
         price: '4,500',
-        image: "https://placehold.co/600x400/800020/D4AF37?text=Executive+Suite",
+        image: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&h=400&fit=crop&q=80",
         amenities: ["Living Area", "Ocean View", "Mini Bar"]
     },
     {
         id: 3,
         name: "Presidential Suite",
         price: '8,000',
-        image: "https://placehold.co/600x400/800020/D4AF37?text=Presidential+Suite",
+        image: "https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=600&h=400&fit=crop&q=80",
         amenities: ["Private Pool", "Butler Service", "Jacuzzi"]
     }
 ];
